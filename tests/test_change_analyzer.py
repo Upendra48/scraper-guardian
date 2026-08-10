@@ -104,6 +104,21 @@ def main():
     changes = analyzer.analyze(
         matches
     )
+    
+    recommendations = analyzer.generate_recommendations(changes)
+
+    print("\n" + "=" * 70)
+    print("RECOMMENDATIONS")
+    print("=" * 70)
+
+    for index, recommendation in enumerate(
+        recommendations,
+        start=1,
+    ):
+        print(f"\n[{index}]")
+        print(f"Type:     {recommendation['type']}")
+        print(f"Severity: {recommendation['severity']}")
+        print(f"Message:  {recommendation['message']}")
 
     print(
         f"Detected changes:   "

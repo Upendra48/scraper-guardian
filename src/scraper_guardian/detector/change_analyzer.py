@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -40,7 +41,6 @@ class ChangeAnalyzer:
         "If they are the same element, what changed?"
     """
 
-    # Attributes that are especially important for web scrapers.
     IMPORTANT_ATTRIBUTES = {
         "href",
         "src",
@@ -52,9 +52,9 @@ class ChangeAnalyzer:
         "type",
     }
 
-    # --------------------------------------------------
+    # ==================================================
     # PUBLIC API
-    # --------------------------------------------------
+    # ==================================================
 
     def analyze(
         self,
@@ -93,9 +93,447 @@ class ChangeAnalyzer:
 
         return changes
 
-    # --------------------------------------------------
+    # ==================================================
+    # RECOMMENDATIONS
+    # ==================================================
+
+    def generate_recommendations(
+        self,
+        changes: list[ElementChange],
+    ) -> list[dict[str, str]]:
+        """
+        Generate actionable recommendations from detected changes.
+
+        Recommendations are derived from the detected changes and are
+        independent of any specific website.
+        """
+
+        recommendations: list[dict[str, str]] = []
+
+        # ------------------------------------------
+        # HREF / URL changes
+        # ------------------------------------------
+
+        href_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "href"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if href_changes:
+
+            old_patterns: set[str] = set()
+            new_patterns: set[str] = set()
+
+            for change in href_changes:
+
+                old_value = str(
+                    change.old_value or ""
+                )
+
+                new_value = str(
+                    change.new_value or ""
+                )
+
+                old_pattern = (
+                    self._normalize_url_pattern(
+                        old_value
+                    )
+                )
+
+                new_pattern = (
+                    self._normalize_url_pattern(
+                        new_value
+                    )
+                )
+
+                if old_pattern:
+                    old_patterns.add(
+                        old_pattern
+                    )
+
+                if new_pattern:
+                    new_patterns.add(
+                        new_pattern
+                    )
+
+            # --------------------------------------
+            # URL pattern changed
+            # --------------------------------------
+
+            if (
+                old_patterns
+                and new_patterns
+                and old_patterns != new_patterns
+            ):
+
+                old_pattern_text = ", ".join(
+                    sorted(old_patterns)
+                )
+
+                new_pattern_text = ", ".join(
+                    sorted(new_patterns)
+                )
+
+                recommendations.append(
+                    {
+                        "type": "url_pattern_changed",
+                        "severity": "HIGH",
+                        "message": (
+                            "The URL structure appears to have changed "
+                            "from:\n\n"
+                            f"{old_pattern_text}\n\n"
+                            "to:\n\n"
+                            f"{new_pattern_text}\n\n"
+                            "A scraper using the old URL pattern should "
+                            "be reviewed."
+                        ),
+                    }
+                )
+
+            # --------------------------------------
+            # HREF changed but no clear pattern
+            # --------------------------------------
+
+            else:
+
+                recommendations.append(
+                    {
+                        "type": "href_changed",
+                        "severity": "HIGH",
+                        "message": (
+                            "One or more link destinations changed. "
+                            "Review the scraper's URL extraction logic."
+                        ),
+                    }
+                )
+
+        # ==================================================
+        # CLASS CHANGES
+        # ==================================================
+
+        class_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "class"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if class_changes:
+
+            recommendations.append(
+                {
+                    "type": "selector_class_changed",
+                    "severity": "MEDIUM",
+                    "message": (
+                        "CSS class attributes changed. "
+                        "Review scrapers using class-based "
+                        "CSS or XPath selectors."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # ID CHANGES
+        # ==================================================
+
+        id_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "id"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if id_changes:
+
+            recommendations.append(
+                {
+                    "type": "selector_id_changed",
+                    "severity": "HIGH",
+                    "message": (
+                        "Element IDs changed. "
+                        "Review scrapers using ID-based "
+                        "CSS or XPath selectors."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # NAME CHANGES
+        # ==================================================
+
+        name_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "name"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if name_changes:
+
+            recommendations.append(
+                {
+                    "type": "selector_name_changed",
+                    "severity": "HIGH",
+                    "message": (
+                        "Element name attributes changed. "
+                        "Review scrapers using name-based "
+                        "selectors or form fields."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # SRC CHANGES
+        # ==================================================
+
+        src_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "src"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if src_changes:
+
+            recommendations.append(
+                {
+                    "type": "resource_url_changed",
+                    "severity": "HIGH",
+                    "message": (
+                        "One or more resource URLs changed. "
+                        "Review scrapers that download or "
+                        "parse linked resources."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # FORM ACTION CHANGES
+        # ==================================================
+
+        action_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "action"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if action_changes:
+
+            recommendations.append(
+                {
+                    "type": "form_action_changed",
+                    "severity": "HIGH",
+                    "message": (
+                        "A form submission URL changed. "
+                        "Review form-based scraping or "
+                        "request logic."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # TYPE CHANGES
+        # ==================================================
+
+        type_changes = [
+            change
+            for change in changes
+            if (
+                change.attribute == "type"
+                and change.change_type
+                in {
+                    "attribute_changed",
+                    "attribute_added",
+                    "attribute_removed",
+                }
+            )
+        ]
+
+        if type_changes:
+
+            recommendations.append(
+                {
+                    "type": "element_type_changed",
+                    "severity": "MEDIUM",
+                    "message": (
+                        "An element's type attribute changed. "
+                        "Review interaction or extraction logic."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # TEXT CHANGES
+        # ==================================================
+
+        text_changes = [
+            change
+            for change in changes
+            if change.change_type == "text_changed"
+        ]
+
+        if text_changes:
+
+            recommendations.append(
+                {
+                    "type": "text_changed",
+                    "severity": "MEDIUM",
+                    "message": (
+                        "Visible element text changed. "
+                        "Review scrapers that identify elements "
+                        "using exact text or text-based selectors."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # ELEMENT REMOVALS
+        # ==================================================
+
+        removed_elements = [
+            change
+            for change in changes
+            if change.change_type == "element_removed"
+        ]
+
+        if removed_elements:
+
+            recommendations.append(
+                {
+                    "type": "element_removed",
+                    "severity": "HIGH",
+                    "message": (
+                        "Elements used by the previous page "
+                        "structure were removed. Review selectors "
+                        "and extraction logic."
+                    ),
+                }
+            )
+
+        # ==================================================
+        # ELEMENT ADDITIONS
+        # ==================================================
+
+        added_elements = [
+            change
+            for change in changes
+            if change.change_type == "element_added"
+        ]
+
+        if added_elements:
+
+            recommendations.append(
+                {
+                    "type": "element_added",
+                    "severity": "LOW",
+                    "message": (
+                        "New elements were added to the page. "
+                        "Check whether they contain new data or "
+                        "affect the scraper's element hierarchy."
+                    ),
+                }
+            )
+
+        return recommendations
+
+    # ==================================================
+    # URL PATTERN NORMALIZATION
+    # ==================================================
+
+    @staticmethod
+    def _normalize_url_pattern(
+        url: str,
+    ) -> str:
+        """
+        Convert a concrete URL into a reusable URL pattern.
+
+        Examples:
+
+            bids.aspx?bidID=287
+                ->
+            bids.aspx?bidID=<id>
+
+            /procurement/bid/287
+                ->
+            /procurement/bid/<id>
+        """
+
+        if not url:
+            return ""
+
+        value = url.strip()
+
+        # ------------------------------------------
+        # bidID query parameter
+        # ------------------------------------------
+
+        value = __import__("re").sub(
+            r"([?&]bidID=)\d+",
+            r"\1<id>",
+            value,
+            flags=__import__("re").IGNORECASE,
+        )
+
+        # ------------------------------------------
+        # Generic numeric path component
+        # ------------------------------------------
+
+        value = __import__("re").sub(
+            r"/\d+(?=/?$)",
+            "/<id>",
+            value,
+        )
+
+        return value
+
+    # ==================================================
     # ATTRIBUTE ANALYSIS
-    # --------------------------------------------------
+    # ==================================================
 
     def _analyze_attributes(
         self,
@@ -115,25 +553,34 @@ class ChangeAnalyzer:
 
         for attribute in sorted(all_attributes):
 
-            old_value = old_attributes.get(attribute)
-            new_value = new_attributes.get(attribute)
+            old_value = old_attributes.get(
+                attribute
+            )
+
+            new_value = new_attributes.get(
+                attribute
+            )
 
             # No change.
             if old_value == new_value:
                 continue
 
-            severity, impact = self._classify_attribute_change(
-                attribute=attribute,
-                previous=previous,
-                current=current,
-                old_value=old_value,
-                new_value=new_value,
+            severity, impact = (
+                self._classify_attribute_change(
+                    attribute=attribute,
+                    previous=previous,
+                    current=current,
+                    old_value=old_value,
+                    new_value=new_value,
+                )
             )
 
-            change_type = self._get_attribute_change_type(
-                attribute=attribute,
-                old_value=old_value,
-                new_value=new_value,
+            change_type = (
+                self._get_attribute_change_type(
+                    attribute=attribute,
+                    old_value=old_value,
+                    new_value=new_value,
+                )
             )
 
             changes.append(
@@ -155,9 +602,9 @@ class ChangeAnalyzer:
 
         return changes
 
-    # --------------------------------------------------
+    # ==================================================
     # TEXT ANALYSIS
-    # --------------------------------------------------
+    # ==================================================
 
     def _analyze_text(
         self,
@@ -177,10 +624,13 @@ class ChangeAnalyzer:
             return None
 
         severity = "LOW"
-        impact = "Visible element text changed."
 
-        # Text changes on links/buttons can be more important
-        # because scrapers often identify elements by visible text.
+        impact = (
+            "Visible element text changed."
+        )
+
+        # Text changes on interactive elements
+        # can affect text-based selectors.
         if current.tag in {
             "a",
             "button",
@@ -210,9 +660,9 @@ class ChangeAnalyzer:
             ],
         )
 
-    # --------------------------------------------------
+    # ==================================================
     # ATTRIBUTE CHANGE CLASSIFICATION
-    # --------------------------------------------------
+    # ==================================================
 
     def _classify_attribute_change(
         self,
@@ -367,9 +817,9 @@ class ChangeAnalyzer:
             f"Attribute '{attribute}' changed.",
         )
 
-    # --------------------------------------------------
+    # ==================================================
     # ATTRIBUTE CHANGE TYPE
-    # --------------------------------------------------
+    # ==================================================
 
     @staticmethod
     def _get_attribute_change_type(
@@ -394,9 +844,9 @@ class ChangeAnalyzer:
 
         return "attribute_changed"
 
-    # --------------------------------------------------
+    # ==================================================
     # TEXT NORMALIZATION
-    # --------------------------------------------------
+    # ==================================================
 
     @staticmethod
     def _normalize_text(
@@ -409,3 +859,4 @@ class ChangeAnalyzer:
         return " ".join(
             text.split()
         )
+
