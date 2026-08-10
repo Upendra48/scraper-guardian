@@ -15,35 +15,28 @@ from scraper_guardian.detector.change_analyzer import (
 )
 
 
-PREVIOUS = Path(
-    "snapshots/coffeyville_kansas/2026-08-10/"
-    "20260810_054925/normalized.html"
+BASE = Path(
+    "snapshots/coffeyville_kansas/2026-08-10"
 )
 
-CURRENT = Path(
-    "snapshots/coffeyville_kansas/2026-08-10/"
-    "20260810_054940/normalized.html"
+PREVIOUS = (
+    BASE
+    / "20260810_054940"
+    / "normalized.html"
+)
+
+CURRENT = (
+    BASE
+    / "manual_test"
+    / "normalized.html"
 )
 
 
-def load_elements(path):
+def load_html(path: Path) -> str:
 
-    html = Path(path).read_text(
+    return path.read_text(
         encoding="utf-8"
     )
-
-    soup = BeautifulSoup(
-        html,
-        "html.parser",
-    )
-
-    detector = StructuralDetector()
-
-    elements = detector._get_elements(
-        soup
-    )
-    
-    return list(elements.values())
 
 
 def main():
@@ -52,13 +45,26 @@ def main():
     print("CHANGE ANALYZER TEST")
     print("=" * 70)
 
-    previous_elements = load_elements(
+    previous_html = load_html(
         PREVIOUS
     )
 
-    current_elements = load_elements(
+    current_html = load_html(
         CURRENT
     )
+
+    detector = StructuralDetector()
+
+    previous_elements = detector.extract_elements(
+        previous_html
+    )
+
+    current_elements = detector.extract_elements(
+        current_html
+    )
+    
+    previous_elements = list(previous_elements.values())
+    current_elements = list(current_elements.values())
 
     print(
         f"Previous elements: "
@@ -70,9 +76,14 @@ def main():
         f"{len(current_elements)}"
     )
 
-    # ----------------------------------------------
-    # MATCH
-    # ----------------------------------------------
+    # Convert dictionaries to lists.
+    # previous_list = list(
+    #     previous_elements.values()
+    # )
+
+    # current_list = list(
+    #     current_elements.values()
+    # )
 
     matcher = ElementMatcher(
         minimum_score=0.50
@@ -88,10 +99,6 @@ def main():
         f"{len(matches)}"
     )
 
-    # ----------------------------------------------
-    # ANALYZE
-    # ----------------------------------------------
-
     analyzer = ChangeAnalyzer()
 
     changes = analyzer.analyze(
@@ -99,13 +106,15 @@ def main():
     )
 
     print(
-        f"Changed matched elements: "
+        f"Detected changes:   "
         f"{len(changes)}"
     )
 
-    # ----------------------------------------------
-    # DISPLAY
-    # ----------------------------------------------
+    print()
+
+    print("=" * 70)
+    print("DETECTED CHANGES")
+    print("=" * 70)
 
     for index, change in enumerate(
         changes,
@@ -113,79 +122,63 @@ def main():
     ):
 
         print()
-        print("=" * 70)
-
         print(
-            f"CHANGE {index}"
-        )
-
-        print("=" * 70)
-
-        print(
-            f"Tag:    {change.tag}"
+            f"[CHANGE {index}]"
         )
 
         print(
-            f"Impact: {change.impact}"
+            f"Type:       "
+            f"{change.change_type}"
         )
 
         print(
-            f"Previous path:"
+            f"Tag:        "
+            f"{change.tag}"
         )
 
         print(
-            f"  {change.previous_path}"
+            f"Path:       "
+            f"{change.path}"
         )
 
-        print(
-            f"Current path:"
-        )
-
-        print(
-            f"  {change.current_path}"
-        )
-
-        # ------------------------------------------
-        # TEXT
-        # ------------------------------------------
-
-        if change.text_changed:
-
-            print()
-            print("TEXT CHANGED")
+        if change.attribute:
 
             print(
-                f"Old: {change.old_text}"
+                f"Attribute:  "
+                f"{change.attribute}"
             )
 
-            print(
-                f"New: {change.new_text}"
-            )
+        print(
+            f"Severity:   "
+            f"{change.severity}"
+        )
 
-        # ------------------------------------------
-        # ATTRIBUTES
-        # ------------------------------------------
+        print(
+            f"Old:        "
+            f"{change.old_value}"
+        )
 
-        for attribute_change in (
-            change.attribute_changes
-        ):
+        print(
+            f"New:        "
+            f"{change.new_value}"
+        )
 
-            print()
+        print(
+            f"Impact:     "
+            f"{change.impact}"
+        )
 
-            print(
-                f"ATTRIBUTE CHANGED: "
-                f"{attribute_change.attribute}"
-            )
+        if change.evidence:
 
-            print(
-                f"Old: "
-                f"{attribute_change.old_value}"
-            )
+            print("Evidence:")
 
-            print(
-                f"New: "
-                f"{attribute_change.new_value}"
-            )
+            for evidence in change.evidence:
+
+                print(
+                    f"    ✓ {evidence}"
+                )
+
+        print("-" * 70)
 
 
 if __name__ == "__main__":

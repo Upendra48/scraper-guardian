@@ -1,49 +1,60 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from .structural_detector import ElementSnapshot
 from .element_matcher import ElementMatch
-
-
-@dataclass
-class AttributeChange:
-    """
-    Represents a change to a single HTML attribute.
-    """
-
-    attribute: str
-    old_value: str | None
-    new_value: str | None
 
 
 @dataclass
 class ElementChange:
     """
-    Represents all detected changes for one matched element.
+    Represents a change detected between two matched HTML elements.
     """
 
-    previous_path: str
-    current_path: str
+    change_type: str
     tag: str
+    path: str
 
-    text_changed: bool
-    old_text: str
-    new_text: str
+    old_value: object | None = None
+    new_value: object | None = None
 
-    attribute_changes: list[AttributeChange]
+    attribute: str | None = None
 
-    impact: str
+    severity: str = "LOW"
+    impact: str = ""
+
+    evidence: list[str] = field(default_factory=list)
 
 
 class ChangeAnalyzer:
     """
-    Analyze matched HTML elements and determine
-    exactly what changed.
+    Analyze matched HTML elements and identify meaningful changes.
+
+    The ElementMatcher answers:
+
+        "Are these two elements probably the same element?"
+
+    The ChangeAnalyzer answers:
+
+        "If they are the same element, what changed?"
     """
 
-    # ==================================================
+    # Attributes that are especially important for web scrapers.
+    IMPORTANT_ATTRIBUTES = {
+        "href",
+        "src",
+        "id",
+        "name",
+        "class",
+        "action",
+        "value",
+        "type",
+    }
+
+    # --------------------------------------------------
     # PUBLIC API
-    # ==================================================
+    # --------------------------------------------------
 
     def analyze(
         self,
@@ -54,161 +65,347 @@ class ChangeAnalyzer:
 
         for match in matches:
 
-            change = self._analyze_match(
-                match
+            previous = match.previous
+            current = match.current
+
+            # ------------------------------------------
+            # Attribute changes
+            # ------------------------------------------
+
+            changes.extend(
+                self._analyze_attributes(
+                    previous,
+                    current,
+                )
             )
 
-            # Only keep elements where something
-            # actually changed.
-            if (
-                change.text_changed
-                or change.attribute_changes
-            ):
+            # ------------------------------------------
+            # Text changes
+            # ------------------------------------------
 
-                changes.append(
-                    change
-                )
+            text_change = self._analyze_text(
+                previous,
+                current,
+            )
+
+            if text_change is not None:
+                changes.append(text_change)
 
         return changes
 
-    # ==================================================
-    # SINGLE ELEMENT
-    # ==================================================
+    # --------------------------------------------------
+    # ATTRIBUTE ANALYSIS
+    # --------------------------------------------------
 
-    def _analyze_match(
+    def _analyze_attributes(
         self,
-        match: ElementMatch,
-    ) -> ElementChange:
+        previous: ElementSnapshot,
+        current: ElementSnapshot,
+    ) -> list[ElementChange]:
 
-        previous = match.previous
-        current = match.current
+        changes: list[ElementChange] = []
 
-        # ------------------------------------------------
-        # TEXT
-        # ------------------------------------------------
-
-        old_text = (
-            previous.text
-            .strip()
-        )
-
-        new_text = (
-            current.text
-            .strip()
-        )
-
-        text_changed = (
-            old_text != new_text
-        )
-
-        # ------------------------------------------------
-        # ATTRIBUTES
-        # ------------------------------------------------
-
-        attribute_changes = []
+        old_attributes = previous.attributes
+        new_attributes = current.attributes
 
         all_attributes = (
-            set(previous.attributes)
-            | set(current.attributes)
+            set(old_attributes)
+            | set(new_attributes)
         )
 
-        for attribute in sorted(
-            all_attributes
-        ):
+        for attribute in sorted(all_attributes):
 
-            old_value = previous.attributes.get(
-                attribute
+            old_value = old_attributes.get(attribute)
+            new_value = new_attributes.get(attribute)
+
+            # No change.
+            if old_value == new_value:
+                continue
+
+            severity, impact = self._classify_attribute_change(
+                attribute=attribute,
+                previous=previous,
+                current=current,
+                old_value=old_value,
+                new_value=new_value,
             )
 
-            new_value = current.attributes.get(
-                attribute
+            change_type = self._get_attribute_change_type(
+                attribute=attribute,
+                old_value=old_value,
+                new_value=new_value,
             )
 
-            if old_value != new_value:
-
-                attribute_changes.append(
-                    AttributeChange(
-                        attribute=attribute,
-                        old_value=old_value,
-                        new_value=new_value,
-                    )
+            changes.append(
+                ElementChange(
+                    change_type=change_type,
+                    tag=current.tag,
+                    path=current.path,
+                    old_value=old_value,
+                    new_value=new_value,
+                    attribute=attribute,
+                    severity=severity,
+                    impact=impact,
+                    evidence=[
+                        "Element matched by ElementMatcher",
+                        f"Attribute '{attribute}' changed",
+                    ],
                 )
+            )
 
-        # ------------------------------------------------
-        # IMPACT
-        # ------------------------------------------------
+        return changes
 
-        impact = self._determine_impact(
-            previous,
-            current,
-            text_changed,
-            attribute_changes,
+    # --------------------------------------------------
+    # TEXT ANALYSIS
+    # --------------------------------------------------
+
+    def _analyze_text(
+        self,
+        previous: ElementSnapshot,
+        current: ElementSnapshot,
+    ) -> ElementChange | None:
+
+        old_text = self._normalize_text(
+            previous.text
         )
+
+        new_text = self._normalize_text(
+            current.text
+        )
+
+        if old_text == new_text:
+            return None
+
+        severity = "LOW"
+        impact = "Visible element text changed."
+
+        # Text changes on links/buttons can be more important
+        # because scrapers often identify elements by visible text.
+        if current.tag in {
+            "a",
+            "button",
+            "input",
+            "label",
+        }:
+
+            severity = "MEDIUM"
+
+            impact = (
+                "Visible text changed on an interactive "
+                "element. Text-based scraper selectors "
+                "may need updating."
+            )
 
         return ElementChange(
-            previous_path=previous.path,
-            current_path=current.path,
+            change_type="text_changed",
             tag=current.tag,
-            text_changed=text_changed,
-            old_text=old_text,
-            new_text=new_text,
-            attribute_changes=attribute_changes,
+            path=current.path,
+            old_value=previous.text,
+            new_value=current.text,
+            severity=severity,
             impact=impact,
+            evidence=[
+                "Element matched by ElementMatcher",
+                "Text content changed",
+            ],
         )
 
-    # ==================================================
-    # IMPACT
-    # ==================================================
+    # --------------------------------------------------
+    # ATTRIBUTE CHANGE CLASSIFICATION
+    # --------------------------------------------------
+
+    def _classify_attribute_change(
+        self,
+        attribute: str,
+        previous: ElementSnapshot,
+        current: ElementSnapshot,
+        old_value: object,
+        new_value: object,
+    ) -> tuple[str, str]:
+
+        # ------------------------------------------
+        # HREF
+        # ------------------------------------------
+
+        if attribute == "href":
+
+            if current.tag == "a":
+
+                return (
+                    "HIGH",
+                    (
+                        "Link destination changed. "
+                        "A scraper using this URL or URL "
+                        "pattern may need to be updated."
+                    ),
+                )
+
+            return (
+                "MEDIUM",
+                "href attribute changed.",
+            )
+
+        # ------------------------------------------
+        # SRC
+        # ------------------------------------------
+
+        if attribute == "src":
+
+            return (
+                "HIGH",
+                (
+                    "Resource URL changed. "
+                    "A scraper downloading or parsing "
+                    "this resource may be affected."
+                ),
+            )
+
+        # ------------------------------------------
+        # ID
+        # ------------------------------------------
+
+        if attribute == "id":
+
+            return (
+                "HIGH",
+                (
+                    "Element ID changed. "
+                    "ID-based CSS/XPath selectors may "
+                    "no longer work."
+                ),
+            )
+
+        # ------------------------------------------
+        # NAME
+        # ------------------------------------------
+
+        if attribute == "name":
+
+            return (
+                "HIGH",
+                (
+                    "Element name changed. "
+                    "Name-based selectors may need "
+                    "to be updated."
+                ),
+            )
+
+        # ------------------------------------------
+        # CLASS
+        # ------------------------------------------
+
+        if attribute == "class":
+
+            return (
+                "MEDIUM",
+                (
+                    "CSS class changed. "
+                    "Class-based selectors may be affected."
+                ),
+            )
+
+        # ------------------------------------------
+        # FORM ACTION
+        # ------------------------------------------
+
+        if attribute == "action":
+
+            return (
+                "HIGH",
+                (
+                    "Form submission URL changed. "
+                    "Form-based scraping logic may be affected."
+                ),
+            )
+
+        # ------------------------------------------
+        # TYPE
+        # ------------------------------------------
+
+        if attribute == "type":
+
+            return (
+                "MEDIUM",
+                (
+                    "Element type changed and may affect "
+                    "interaction or extraction logic."
+                ),
+            )
+
+        # ------------------------------------------
+        # VALUE
+        # ------------------------------------------
+
+        if attribute == "value":
+
+            return (
+                "LOW",
+                "Element value changed.",
+            )
+
+        # ------------------------------------------
+        # DATA ATTRIBUTES
+        # ------------------------------------------
+
+        if attribute.startswith("data-"):
+
+            return (
+                "MEDIUM",
+                (
+                    f"Data attribute '{attribute}' changed. "
+                    "Scraper logic using this attribute "
+                    "may be affected."
+                ),
+            )
+
+        # ------------------------------------------
+        # OTHER
+        # ------------------------------------------
+
+        return (
+            "LOW",
+            f"Attribute '{attribute}' changed.",
+        )
+
+    # --------------------------------------------------
+    # ATTRIBUTE CHANGE TYPE
+    # --------------------------------------------------
 
     @staticmethod
-    def _determine_impact(
-        previous,
-        current,
-        text_changed: bool,
-        attribute_changes: list[AttributeChange],
+    def _get_attribute_change_type(
+        attribute: str,
+        old_value: object | None,
+        new_value: object | None,
     ) -> str:
 
-        changed_attributes = {
-            change.attribute
-            for change in attribute_changes
-        }
+        if (
+            old_value is None
+            and new_value is not None
+        ):
 
-        # ----------------------------------------------
-        # HIGH IMPACT
-        #
-        # Changes that can directly break a scraper.
-        # ----------------------------------------------
+            return "attribute_added"
 
-        if "href" in changed_attributes:
+        if (
+            old_value is not None
+            and new_value is None
+        ):
 
-            return "HIGH"
+            return "attribute_removed"
 
-        if "id" in changed_attributes:
+        return "attribute_changed"
 
-            return "HIGH"
+    # --------------------------------------------------
+    # TEXT NORMALIZATION
+    # --------------------------------------------------
 
-        if "name" in changed_attributes:
+    @staticmethod
+    def _normalize_text(
+        text: str | None,
+    ) -> str:
 
-            return "HIGH"
+        if not text:
+            return ""
 
-        # ----------------------------------------------
-        # MEDIUM IMPACT
-        # ----------------------------------------------
-
-        if "class" in changed_attributes:
-
-            return "MEDIUM"
-
-        if text_changed:
-
-            return "MEDIUM"
-
-        # ----------------------------------------------
-        # LOW
-        # ----------------------------------------------
-
-        if attribute_changes:
-
-            return "LOW"
-
-        return "NONE"
+        return " ".join(
+            text.split()
+        )

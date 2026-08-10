@@ -278,3 +278,21 @@ class StructuralDetector:
                 new_value=current.text[:500],
             )
         )
+        
+    def extract_elements(
+        self,
+        html: str,
+        ) -> dict[str, ElementSnapshot]:
+        """
+    Extract all HTML elements from a document.
+
+    Returns:
+        Dictionary mapping element paths to ElementSnapshot objects.
+    """
+
+        soup = BeautifulSoup(
+        html,
+        "html.parser",
+        )
+
+        return self._get_elements(soup)    
