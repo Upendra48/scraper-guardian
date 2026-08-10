@@ -68,6 +68,7 @@ class SnapshotCollector:
         )
 
         metadata = {
+            "snapshot_id":snapshot_id,
             "site_name": site_name,
             "url": url,
             "timestamp": timestamp.isoformat(),
@@ -88,26 +89,34 @@ class SnapshotCollector:
     @staticmethod
     def _normalize_html(html: str) -> str:
         """
-        Create a basic normalized version of HTML.
-
-        This is intentionally conservative.
-        We will improve normalization in a later milestone.
+        Create a normalized HTML representation suitable for structureal comparison.
+        
+        Dynamic JavaScript, CSS, and non-content elements
+        are removed. Whitespace is normalized while keeping
+        the HTML readable.
         """
 
         soup = BeautifulSoup(html, "html.parser")
 
         # Remove elements that commonly contain dynamic content.
-        for element in soup.find_all(
-            ["script", "style", "noscript"]
+        for comment in soup.find_all(
+            string=lambda text: isinstance(text, str)
+            and text.strip().startswith("<!--")
         ):
-            element.decompose()
+            comment.extract()
 
         normalized = soup.prettify()
 
         # Normalize whitespace.
         normalized = re.sub(
-            r"\s+",
+            r"[ \t]+",
             " ",
+            normalized,
+        )
+        
+        normalized = re.sub(
+            r"\n\s*\n+",
+            "\n",
             normalized,
         ).strip()
 
