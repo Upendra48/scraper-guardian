@@ -6,7 +6,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 @dataclass
-class ElementSnaoshot:
+class ElementSnapshot:
     tag: str
     path: str
     attributes: dict
@@ -62,87 +62,60 @@ class StructuralDetector:
 
         changes = []
 
-        previous_keys = set(previous_elements)
-        current_keys = set(current_elements)
+        previous_paths = set(previous_elements)
+        current_paths = set(current_elements)
 
         # Elements that were added.
-        for key in current_keys - previous_keys:
-            element = current_elements[key]
+        for path in current_paths - previous_paths:
+            element = current_elements[path]
 
             changes.append(
                 StructuralChange(
                     change_type="element_added",
-                    tag=element.name,
-                    path=key,
+                    tag=element.tag,
+                    path=element.path,
                     details=str(element)[:200],
                 )
             )
 
         # Elements that were removed.
-        for key in previous_keys - current_keys:
-            element = previous_elements[key]
+        for key in previous_paths - current_paths:
+            element = previous_elements[path]
 
             changes.append(
                 StructuralChange(
                     change_type="element_removed",
                     tag=element.name,
-                    path=key,
+                    path=element.path,
                     details=str(element)[:200],
                 )
             )
             
+        # Existing elements
+        for path in previous_paths & current_paths:
 
-        for key in previous_keys & current_keys:
+            previous_element = previous_elements[path]
+            current_element = current_elements[path]
 
-            previous_element = previous_elements[key]
-            current_element = current_elements[key]
-
-            previous_attributes = dict(
-                previous_element.attrs
+            self._compare_attributes(
+                previous_element,
+                current_element,
+                changes,
             )
-
-            current_attributes = dict(
-                current_element.attrs
-            )
-
-            attribute_names = (
-                set(previous_attributes)
-                | set(current_attributes)
-            )
-
             
-            # Attributes that changed.
-            for attribute in attribute_names:
-
-                old_value = previous_attributes.get(
-                    attribute
-                )
-
-                new_value = current_attributes.get(
-                    attribute
-                )
-
-                if old_value == new_value:
-                    continue
-
-                changes.append(
-                    StructuralChange(
-                        change_type="attribute_changed",
-                        tag=current_element.name,
-                        path=key,
-                        details=(
-                            f"Attribute '{attribute}' "
-                            f"changed."
-                        ),
-                        old_value=str(old_value),
-                        new_value=str(new_value),
-                    )
-                )    
+            self._compare_text(
+                previous_element,
+                current_element,
+                changes,
+            )
         
         return StructuralDiff(
             changed=bool(changes),
             changes=changes,
-        )
+        )    
+        
+    
+    # HTML Loading    
 
     @staticmethod
     def _read_html(
@@ -157,29 +130,47 @@ class StructuralDetector:
             )
 
         return str(html_or_path)
-
+    
+    # Element Extraction
     @staticmethod
     def _get_elements(
         soup: BeautifulSoup,
-    ) -> dict[str, object]:
+    ) -> dict[str, ElementSnapshot]:
 
-        elements = {}
+        elements:dict[str, ElementSnapshot] = {}
 
         for element in soup.find_all(True):
 
             path = StructuralDetector._get_path(
                 element
             )
-            identity = StructuralDetector._get_identity(
-                element
+            
+            attributes = {}
+            
+            for name, value in element.attrs.items():
+                
+                if isinstance(value, list):
+                    value = " ".join(value)
+                    
+                attributes[name]=  str(value)    
+                
+            text = element.get_text(
+                " ", strip=True,
+            )    
+            
+            snapshot = ElementSnapshot(
+                tag=element.name,
+                path=path,
+                attributes=attributes,
+                text=text,
             )
             
-            key = f"{path}|{identity}"
-
-            elements[key] = element
-
+            elements[path] = snapshot
+            
         return elements
 
+
+    # Path generation
     @staticmethod
     def _get_path(element) -> str:
 
@@ -217,54 +208,73 @@ class StructuralDetector:
         )
     
     
+    # ======================================================
+    # Attribute comparison
+    # ======================================================
+
     @staticmethod
-    def _get_identity(element) -> str:
-        """
-        Generate a stable identity for an HTML element.
-        """
-        
-        #Strongest identifier: id
-        element_id = element.get("id")
-        if element_id:
-            return f"{element.name}#{element['id']}"
-        
-        
-        # Second: name
-        name = element.get("name")
-        if name:
-            return(
-                f"{element.name}"
-                f"[name={element.get("name")}]"
+    def _compare_attributes(
+        previous: ElementSnapshot,
+        current: ElementSnapshot,
+        changes: list[StructuralChange],
+    ):
+
+        attribute_names = (
+            set(previous.attributes)
+            | set(current.attributes)
+        )
+
+        for attribute in attribute_names:
+
+            old_value = previous.attributes.get(
+                attribute
             )
 
-        classes = element.get("class")
+            new_value = current.attributes.get(
+                attribute
+            )
 
-        if classes:
-            if isinstance(classes, list):
-                classes = ".".join(classes)
+            if old_value == new_value:
+                continue
 
-            return f"{element.name}.{classes}"
-        
-        # Useful attributes for links
-        href = element.get("href")
-        if href:
-            return(
-                f"{element.name}"
-                f"[href='{href}']"
-            )    
-            
-        # Useful attribues for inputs
-        input_type = element.get("type")
-        if input_type:
-            return(
-                f"{element.name}"
-                f"[type='{input_type}']"
-            )    
+            changes.append(
+                StructuralChange(
+                    change_type="attribute_changed",
+                    tag=current.tag,
+                    path=current.path,
+                    details=(
+                        f"Attribute '{attribute}' "
+                        "changed."
+                    ),
+                    old_value=old_value,
+                    new_value=new_value,
+                )
+            )
 
-        # if element.get("name"):
-        #     return (
-        #     f"{element.name}"
-        #     f"[name='{element['name']}']"
-        # )
+    # ======================================================
+    # Text comparison
+    # ======================================================
 
-        return element.name
+    @staticmethod
+    def _compare_text(
+        previous: ElementSnapshot,
+        current: ElementSnapshot,
+        changes: list[StructuralChange],
+    ):
+
+        if previous.text == current.text:
+            return
+
+        changes.append(
+            StructuralChange(
+                change_type="text_changed",
+                tag=current.tag,
+                path=current.path,
+                details=(
+                    f"Text content of "
+                    f"<{current.tag}> changed."
+                ),
+                old_value=previous.text[:500],
+                new_value=current.text[:500],
+            )
+        )
