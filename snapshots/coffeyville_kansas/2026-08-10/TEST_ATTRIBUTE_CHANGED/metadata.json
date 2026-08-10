@@ -1,0 +1,11 @@
+{
+    "site_name": "coffeyville_kansas",
+    "url": "https://www.coffeyville.com/bids.aspx",
+    "timestamp": "2026-08-10T05:49:40.543176+00:00",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "content_length": 103073,
+    "raw_html_sha256": "e2b0fca94a111230af1cff5ef9bb2506392fb45f5e73ad77bfa126ded5cb3699",
+    "normalized_html_sha256": "5faaf256b3064869b3cfd46e9c7da5c1895281f08da6674006ffa1f0676b0a24",
+    "snapshot_id": "TEST_ATTRIBUTE_CHANGED"
+}
