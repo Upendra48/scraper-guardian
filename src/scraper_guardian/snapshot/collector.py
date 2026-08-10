@@ -89,7 +89,7 @@ class SnapshotCollector:
     @staticmethod
     def _normalize_html(html: str) -> str:
         """
-        Create a normalized HTML representation suitable for structureal comparison.
+        Create a normalized HTML representation suitable for structural comparison.
         
         Dynamic JavaScript, CSS, and non-content elements
         are removed. Whitespace is normalized while keeping
