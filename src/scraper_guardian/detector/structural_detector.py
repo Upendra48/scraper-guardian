@@ -79,13 +79,13 @@ class StructuralDetector:
             )
 
         # Elements that were removed.
-        for key in previous_paths - current_paths:
+        for path in previous_paths - current_paths:
             element = previous_elements[path]
 
             changes.append(
                 StructuralChange(
                     change_type="element_removed",
-                    tag=element.name,
+                    tag=element.tag,
                     path=element.path,
                     details=str(element)[:200],
                 )
@@ -261,8 +261,15 @@ class StructuralDetector:
         current: ElementSnapshot,
         changes: list[StructuralChange],
     ):
+        
+        if previous.tag in {"html", "body"}:
+            return
+        
 
-        if previous.text == current.text:
+        if previous.text.strip() == current.text.strip():
+            return
+        
+        if len(previous.text) >300 or len(current.text) >300:
             return
 
         changes.append(

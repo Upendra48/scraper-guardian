@@ -1,0 +1,11 @@
+{
+    "snapshot_id": "20260811_042013",
+    "site_name": "beaconbid",
+    "url": "https://www.beaconbid.com/integrations/widget/greenville-spartanburg-airport-district",
+    "timestamp": "2026-08-11T04:20:13.485966+00:00",
+    "status_code": 200,
+    "content_type": "text/html; charset=utf-8",
+    "content_length": 1419,
+    "raw_html_sha256": "7acb202e9e3aa765936a641ab8d374b0e82a8f005572d5318f9ab1c37455dc2b",
+    "normalized_html_sha256": "994ee6de02d36b4b908860f15a88098899409fa2ae993637a5b1ad471f86ed89"
+}

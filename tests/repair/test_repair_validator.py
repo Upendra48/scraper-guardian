@@ -20,19 +20,18 @@ from scraper_guardian.repair.repair_validator import (
 
 
 BASE_DIR = Path(
-    "snapshots/coffeyville_kansas/2026-08-10"
+    "snapshots/beaconbid/2026-08-11"
 )
 
 PREVIOUS = (
     BASE_DIR
-    / "20260810_054925"
+    / "20260811_042013"
     / "normalized.html"
 )
 
 CURRENT = (
     BASE_DIR
-    / "manual_test"
-    / "normalized.html"
+    / "test_modified.html"
 )
 
 
@@ -88,7 +87,9 @@ def main():
         f"Current elements:  {len(current_elements)}"
     )
 
-    matcher = ElementMatcher()
+    matcher = ElementMatcher(
+        
+    )
 
     matches = matcher.match(
         previous_elements,

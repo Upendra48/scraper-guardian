@@ -35,7 +35,7 @@ CURRENT = (
     / "snapshots"
     / "coffeyville_kansas"
     / "2026-08-10"
-    / "manual_test"
+    / "random_change"
     / "normalized.html"
 )
 

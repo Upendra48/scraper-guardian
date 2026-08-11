@@ -1,7 +1,7 @@
 from scraper_guardian.snapshot.collector import SnapshotCollector
 
 
-URL = "https://www.coffeyville.com/bids.aspx"
+URL = "https://www.beaconbid.com/integrations/widget/greenville-spartanburg-airport-district"
 
 
 def main():
@@ -9,7 +9,7 @@ def main():
 
     snapshot_dir = collector.collect(
         url=URL,
-        site_name="coffeyville_kansas",
+        site_name="beaconbid",
     )
 
     print("=" * 60)

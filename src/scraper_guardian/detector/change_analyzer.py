@@ -611,6 +611,9 @@ class ChangeAnalyzer:
         previous: ElementSnapshot,
         current: ElementSnapshot,
     ) -> ElementChange | None:
+        
+        if current.tag in {"html", "body"}:
+            return None
 
         old_text = self._normalize_text(
             previous.text
@@ -621,6 +624,9 @@ class ChangeAnalyzer:
         )
 
         if old_text == new_text:
+            return None
+        
+        if len(old_text) >300 or len(new_text) >300:
             return None
 
         severity = "LOW"

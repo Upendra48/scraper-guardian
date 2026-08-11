@@ -16,19 +16,18 @@ from scraper_guardian.detector.change_analyzer import (
 
 
 BASE = Path(
-    "snapshots/coffeyville_kansas/2026-08-10"
+    "snapshots/beaconbid/2026-08-11"
 )
 
 PREVIOUS = (
     BASE
-    / "20260810_054940"
+    / "20260811_042013"
     / "normalized.html"
 )
 
 CURRENT = (
     BASE
-    / "manual_test"
-    / "normalized.html"
+    / "test_modified.html"
 )
 
 
@@ -63,8 +62,8 @@ def main():
         current_html
     )
     
-    previous_elements = list(previous_elements.values())
-    current_elements = list(current_elements.values())
+    # previous_elements = list(previous_elements.values())
+    # current_elements = list(current_elements.values())
 
     print(
         f"Previous elements: "
@@ -86,7 +85,6 @@ def main():
     # )
 
     matcher = ElementMatcher(
-        minimum_score=0.50
     )
 
     matches = matcher.match(
@@ -190,7 +188,7 @@ def main():
             for evidence in change.evidence:
 
                 print(
-                    f"    ✓ {evidence}"
+                    f" [OK]  {evidence}"
                 )
 
         print("-" * 70)
