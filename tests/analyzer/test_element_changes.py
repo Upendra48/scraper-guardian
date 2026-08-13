@@ -14,12 +14,12 @@ from scraper_guardian.detector.element_change_detector import (
 
 
 BASE_DIR = Path(
-    "snapshots/beaconbid/2026-08-11"
+    "snapshots/clinton/2026-08-13"
 )
 
 PREVIOUS = (
     BASE_DIR
-    / "20260811_042013"
+    / "20260813_034553"
     / "normalized.html"
 )
 

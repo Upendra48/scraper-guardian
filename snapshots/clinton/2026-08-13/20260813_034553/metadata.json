@@ -1,0 +1,11 @@
+{
+    "snapshot_id": "20260813_034553",
+    "site_name": "Clinton Edu",
+    "url": "https://www.clinton.edu/business-office/bids.php",
+    "timestamp": "2026-08-13T03:45:53.775820+00:00",
+    "status_code": 200,
+    "content_type": "text/html; charset=UTF-8",
+    "content_length": 16497,
+    "raw_html_sha256": "3e8f46979f579bd71ffa6011afcd4c23c310739b2084248327e2c675a8e1a8a4",
+    "normalized_html_sha256": "21c31ad5050ffdd49342454f6e016b189ca7cd5fc519ee7676f8cc4219f5d38f"
+}

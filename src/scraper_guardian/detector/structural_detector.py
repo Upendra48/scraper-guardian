@@ -11,6 +11,7 @@ class ElementSnapshot:
     path: str
     attributes: dict
     text: str
+    direct_text: str
 
 @dataclass
 class StructuralChange:
@@ -154,15 +155,27 @@ class StructuralDetector:
                     
                 attributes[name]=  str(value)    
                 
+                
+            # Full test including descendants    
             text = element.get_text(
                 " ", strip=True,
             )    
+            
+            # Only text directly belonging to this element
+            direct_text = " ".join(
+                text.strip()
+                for text in element.find_all(string=True, recursive=False,)
+                if text.strip()
+            )
+            
+            
             
             snapshot = ElementSnapshot(
                 tag=element.name,
                 path=path,
                 attributes=attributes,
                 text=text,
+                direct_text=direct_text,
             )
             
             elements[path] = snapshot
@@ -266,10 +279,10 @@ class StructuralDetector:
             return
         
 
-        if previous.text.strip() == current.text.strip():
+        if previous.direct_text.strip() == current.direct_text.strip():
             return
         
-        if len(previous.text) >300 or len(current.text) >300:
+        if len(previous.direct_text) >300 or len(current.direct_text) >300:
             return
 
         changes.append(
@@ -281,8 +294,8 @@ class StructuralDetector:
                     f"Text content of "
                     f"<{current.tag}> changed."
                 ),
-                old_value=previous.text[:500],
-                new_value=current.text[:500],
+                old_value=previous.direct_text[:500],
+                new_value=current.direct_text[:500],
             )
         )
         

@@ -616,11 +616,11 @@ class ChangeAnalyzer:
             return None
 
         old_text = self._normalize_text(
-            previous.text
+            previous.direct_text
         )
 
         new_text = self._normalize_text(
-            current.text
+            current.direct_text
         )
 
         if old_text == new_text:
@@ -656,8 +656,8 @@ class ChangeAnalyzer:
             change_type="text_changed",
             tag=current.tag,
             path=current.path,
-            old_value=previous.text,
-            new_value=current.text,
+            old_value=previous.direct_text,
+            new_value=current.direct_text,
             severity=severity,
             impact=impact,
             evidence=[
